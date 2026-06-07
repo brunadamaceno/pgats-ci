@@ -1,73 +1,51 @@
+# CI de Nível 04 - Pipeline GitLab CI
 
+# Ordem de execução dos estágios
 stages:
-  - install
-  - lint
-  - test
+  - inspecao
+  - unidade
   - e2e
+  - deploy
 
+# Âncora para reutilizar os passos de setup
+.setup: &setup
+  image: node:latest
+  before_script:
+    - npm install -g yarn
+    - yarn
 
-# Cache do node_modules para evitar baixar tudo a cada job
-cache:
-  key: "$CI_COMMIT_REF_SLUG"
-  paths:
-    - node_modules/
-    - .yarn
-
-
-variables:
-  NODE_ENV: "test"
-
-
-# ── Estágio 1: instalar dependências ──────────────────
-instalar_dependencias:
-  stage: install
-  image: node:20
-  script:
-    - yarn install --frozen-lockfile
-  artifacts:
-    paths:
-      - node_modules/
-    expire_in: 1 hour
-
-
-# ── Estágio 2: lint e formatação ──────────────────────
-verificar_lint:
-  stage: lint
-  image: node:20
-  needs: [instalar_dependencias]
+inspecao:
+  <<: *setup
+  stage: inspecao
   script:
     - yarn lint
 
-
-# ── Estágio 3: testes unitários com Jest ──────────────
-testes_unitarios:
-  stage: test
-  image: node:20
-  needs: [instalar_dependencias]
+unidade:
+  <<: *setup
+  stage: unidade
+  needs: [inspecao]
   script:
-    - yarn test
-  coverage: '/Lines\s*:\s*(\d+\.?\d*)%/'
-  artifacts:
-    when: always
-    paths:
-      - reports/coverage/
-    expire_in: 7 days
+    - yarn run test
 
-
-# ── Estágio 4: testes E2E com Playwright ─────────────
-testes_e2e:
+e2e-tests:
   stage: e2e
   image: mcr.microsoft.com/playwright:v1.47.0-noble
-  needs: [testes_unitarios]
+  needs: [inspecao]
+  before_script:
+    - npm install -g yarn
+    - yarn
   script:
-    - yarn install --frozen-lockfile
-    - yarn e2e
+    - yarn playwright install
+    - yarn run e2e
   artifacts:
-    when: on_failure
+    when: always
+    name: "Relatório de Testes E2E"
     paths:
-      - test-results/
-    expire_in: 3 days
-  only:
-    - master
-    - merge_requests
+      - playwright-report/
 
+deploy:
+  <<: *setup
+  stage: deploy
+  needs: [unidade, e2e-tests]
+  script:
+    - echo 'Deploy sendo realizado...'
