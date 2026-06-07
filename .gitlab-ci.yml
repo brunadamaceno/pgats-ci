@@ -39,7 +39,7 @@ e2e-tests:
     - yarn run e2e
   artifacts:
     when: always
-    name: "Relatório de Testes E2E"
+    name: 'Relatório de Testes E2E'
     paths:
       - playwright-report/
 
